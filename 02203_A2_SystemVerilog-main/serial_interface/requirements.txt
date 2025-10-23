@@ -1,6 +1,0 @@
-# Requirements for serial_interface
-# See README.md and serial_interface.py for context
-
-appJar
-pyserial
-Pillow
