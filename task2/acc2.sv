@@ -13,9 +13,9 @@
 // ----------------------------------------------------------------------------//
 
 module acc #(
-    parameter int LINE_LENGTH = 352,     // pixels per line (must be multiple of 4 for 32-bit words)
-    parameter int LINE_COUNT  = 288,
-    parameter int IMG_MEM_SIZE = 25344   // Number of 32-bit words in the image
+    parameter int LINE_LENGTH     = 352,    // pixels per line (must be multiple of 4 for 32-bit words)
+    parameter int LINE_COUNT      = 288,    
+    parameter int WRITEBACK_ADDR  = 25344   // Starting address for storing processed image (word addressing) 
 ) (
     input  logic        clk,        // The clock.
     input  logic        reset,      // The reset signal. Active high.
@@ -57,39 +57,47 @@ module acc #(
 
     // Buffer file for three lines of image LINE_LENGTH+2 for mirrored border pixels
     logic [7:0]   buf_file [0:2][0:LINE_LENGTH+1];
-    logic [2:0]   buf_line, next_buf_line;
-    logic [15:0]  word_addr, next_word_addr;
+    // signals starting with write_ are used in writeback, others are used for reading
+    logic [15:0]  word_addr, next_word_addr, write_word_addr, next_write_word_addr;
 
-    logic [1:0]   line_top; // Cycles through 0->1->2->0
+    logic [1:0]   line_top, next_line_top, line_mid, line_bot; // Cycles through 0->1->2->0
 
-    assign addr = word_addr; // More clear name without changing port
+    // Multiplex address based on read/write
+    assign addr = we ? write_word_addr : word_addr;
 
     // Will be overwriting oldest line (line_bot)
     assign line_mid = (line_top + 1) % 3;
     assign line_bot = (line_top + 2) % 3;
 
     // Buffer pixel index
-    logic [$clog2(LINE_LENGTH+2)-1:0] buf_pixel_idx, next_buf_pixel_idx;
+    logic [$clog2(LINE_LENGTH+2)-1:0] buf_pixel_idx, next_buf_pixel_idx, write_buf_pixel_idx, next_write_buf_pixel_idx;
+    logic [$clog2(LINE_COUNT+2)-1:0 ] buf_line, next_buf_line, write_buf_line, next_write_buf_line;
 
     // Sequential logic
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
-            state           <= IDLE;
-            word_addr       <= 16'd0;
-            buf_line        <= 3'd1;  // Start at line1 as line0 is mirrored from line1
-            buf_pixel_idx   <= 1;     // Start at index=1 as index=0 is a copy of index=1
-
-            line_top        <= 0;            // Initial top line
+            state               <= IDLE;
+            word_addr           <= 16'd0;
+            buf_line            <= 3'd1;  // Start at line1 as line0 is mirrored from line1
+            buf_pixel_idx       <= 1;     // Start at index=1 as index=0 is a copy of index=1
+            // Write pointers start from 0
+            write_buf_line      <= 0;
+            write_buf_pixel_idx <= 0;
+            write_word_addr     <= WRITEBACK_ADDR;  // Starting address for processed image (word address)
+            line_top            <= 0;               // Initial top line
         end else begin
-            state           <= next_state;
-            buf_line        <= next_buf_line;
-            buf_pixel_idx   <= next_buf_pixel_idx;
-            word_addr       <= next_word_addr;
-
-            line_top        <= next_line_top
+            state               <= next_state;
+            buf_line            <= next_buf_line;
+            buf_pixel_idx       <= next_buf_pixel_idx;
+            word_addr           <= next_word_addr;
+            write_buf_line      <=next_write_buf_line;
+            write_buf_pixel_idx <=next_write_buf_pixel_idx;
+            write_word_addr     <=next_write_word_addr; 
+            line_top            <= next_line_top;
 
             case (state)
-                LOAD_INITIAL_LINES: begin
+                LOAD_INITIAL_LINES,
+                READ_NEW_LINE: begin
                   // Latch word into corresponding pixel in buffer
                   buf_file[buf_line][buf_pixel_idx + 0] <= dataR[7:0];
                   buf_file[buf_line][buf_pixel_idx + 1] <= dataR[15:8];
@@ -132,11 +140,13 @@ module acc #(
         we         = 1'b0;
         dataW      = 32'd0;
         finish     = 1'b0;
-        next_word_addr      = word_addr;
-        next_buf_line       = buf_line;
-        next_buf_pixel_idx  = buf_pixel_idx;
-        next_line_top       = line_top;
-
+        next_word_addr            = word_addr;
+        next_buf_line             = buf_line;
+        next_buf_pixel_idx        = buf_pixel_idx;
+        next_line_top             = line_top;
+        next_write_buf_line       = write_buf_line;
+        next_write_buf_pixel_idx  = write_buf_pixel_idx;
+        next_write_word_addr      = write_word_addr;
 
         case (state)
             IDLE: begin
@@ -149,23 +159,16 @@ module acc #(
                 en = 1'b1;  // Keep memory enabled
 
                 // If last word in line_buf increment line and if we were already writing into 2nd line go to next state
-                if(buf_pixel_idx >= LINE_LENGTH-3) begin
+                if(buf_pixel_idx >= LINE_LENGTH-3) begin // -3 because last idx will be 349
                   if(buf_line == 2) begin
                     next_state = PROCESS_AND_WRITEBACK;
-                    // -------------------------- TEMPORARY BEGIN -------------------------
-                    // Reset line and pixel indices for WRITE_BACK
-                    next_buf_line = 0; 
-                    next_buf_pixel_idx = 0; 
-                    next_word_addr = IMG_MEM_SIZE;
-                    // -------------------------- TEMPORARY END ---------------------------
-                  end else begin
-                    next_buf_line = buf_line + 1; // Go to next line
-                    next_buf_pixel_idx = 1;       // Reset pixel index for new line
-                  end
+                  end 
+                  next_buf_pixel_idx = 1; // Reset pixel index for new line
+                  next_buf_line = buf_line + 1; // Increment buf_line after reading line, it will be used in READ_NEW_LINE
                 end else begin
                   next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
-                  next_word_addr      = word_addr + 1;      // Increment word address
                 end
+                next_word_addr = word_addr + 1; // Increment memory word address      
             end
             PROCESS_AND_WRITEBACK: begin
               //------------------------------------------------
@@ -183,17 +186,20 @@ module acc #(
                   buf_file[write_buf_line][write_buf_pixel_idx + 0]
               };
 
-              // Move through pixels
-              if (write_buf_pixel_idx >= LINE_LENGTH-3) begin
-                  if (write_buf_line == LINE_COUNT) begin
+              // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
+              if (write_buf_pixel_idx >= LINE_LENGTH - 4) begin // -4 because last idx will be 348
+                  if (write_buf_line == LINE_COUNT - 1) begin
                       next_state = DONE;
                   end else begin
                       next_write_buf_line = write_buf_line + 1;
                       next_write_buf_pixel_idx = 0;
+                      next_buf_line  = line_top;  // Prepare buf_line for READ_NEW_LINE
+                      next_state = READ_NEW_LINE;
                   end
               end else begin
                   next_write_buf_pixel_idx = write_buf_pixel_idx + 4;
                   next_write_word_addr = write_word_addr + 1;
+                  next_state = PROCESS_AND_WRITEBACK;
               end
 
             end
@@ -204,42 +210,14 @@ module acc #(
                 next_state = PROCESS_AND_WRITEBACK;
                 next_buf_line = 1; 
                 next_buf_pixel_idx = 1; 
-
                 // Update what is top line in buffer file
                 next_line_top = (line_top + 1) % 3;
               end else begin
+                next_state          = READ_NEW_LINE;
                 next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
                 next_word_addr      = word_addr + 1;      // Increment word address
               end
             end
-            // -------------------------- TEMPORARY BEGIN -------------------------
-            // Temporary write back to memory so we can see if the picture is correct
-            // WRITE_BACK: begin
-            //   en = 1'b1;
-            //   we = 1'b1;
-
-            //   // Pack 4 bytes into one word
-            //   dataW = {
-            //       buf_file[buf_line][buf_pixel_idx + 3],
-            //       buf_file[buf_line][buf_pixel_idx + 2],
-            //       buf_file[buf_line][buf_pixel_idx + 1],
-            //       buf_file[buf_line][buf_pixel_idx + 0]
-            //   };
-
-            //   // Move through pixels
-            //   if (buf_pixel_idx >= LINE_LENGTH-3) begin
-            //       if (buf_line == 2) begin
-            //           next_state = DONE;
-            //       end else begin
-            //           next_buf_line = buf_line + 1;
-            //           next_buf_pixel_idx = 1;
-            //       end
-            //   end else begin
-            //       next_buf_pixel_idx = buf_pixel_idx + 4;
-            //       next_word_addr = word_addr + 1;
-            //   end
-            // end
-            // -------------------------- TEMPORARY END -------------------------
             DONE: begin
                 finish = 1'b1;
                 if (!start)
@@ -249,7 +227,6 @@ module acc #(
             default: next_state = IDLE;
         endcase
     end
-
 endmodule
 
 
