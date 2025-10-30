@@ -82,7 +82,7 @@ module acc #(
             buf_pixel_idx       <= 1;     // Start at index=1 as index=0 is a copy of index=1
             // Write pointers start from 0
             write_buf_line      <= 0;
-            write_buf_pixel_idx <= 0;
+            write_buf_pixel_idx <= 1;
             write_word_addr     <= WRITEBACK_ADDR;  // Starting address for processed image (word address)
             line_top            <= 0;               // Initial top line
         end else begin
@@ -153,6 +153,7 @@ module acc #(
                 if (start) begin
                     next_state = LOAD_INITIAL_LINES;
                     en         = 1'b1;           // enable memory read
+                    next_word_addr = word_addr + 1;
                 end
             end
             LOAD_INITIAL_LINES: begin
@@ -185,20 +186,19 @@ module acc #(
                   buf_file[write_buf_line][write_buf_pixel_idx + 1],
                   buf_file[write_buf_line][write_buf_pixel_idx + 0]
               };
-
+              next_write_word_addr = write_word_addr + 1;
               // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
               if (write_buf_pixel_idx >= LINE_LENGTH - 4) begin // -4 because last idx will be 348
                   if (write_buf_line == LINE_COUNT - 1) begin
                       next_state = DONE;
                   end else begin
                       next_write_buf_line = write_buf_line + 1;
-                      next_write_buf_pixel_idx = 0;
+                      next_write_buf_pixel_idx = 1; // TODO Won't need this when have processing
                       next_buf_line  = line_top;  // Prepare buf_line for READ_NEW_LINE
                       next_state = READ_NEW_LINE;
                   end
               end else begin
                   next_write_buf_pixel_idx = write_buf_pixel_idx + 4;
-                  next_write_word_addr = write_word_addr + 1;
                   next_state = PROCESS_AND_WRITEBACK;
               end
 
