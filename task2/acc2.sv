@@ -49,6 +49,7 @@ module acc #(
         IDLE,                 // Waiting for start
         LOAD_INITIAL_LINES,   // Read data from memory
         PROCESS_AND_WRITEBACK,// Process and write back to memory
+        DELAY,
         READ_NEW_LINE,        // Read new line from memory update indices
         DONE                  // Finished all pixels
     } state_t;
@@ -71,8 +72,10 @@ module acc #(
 
     // Buffer pixel index
     logic [$clog2(LINE_LENGTH+2)-1:0] buf_pixel_idx, next_buf_pixel_idx, write_buf_pixel_idx, next_write_buf_pixel_idx;
-    logic [$clog2(LINE_COUNT+2)-1:0 ] buf_line, next_buf_line, write_buf_line, next_write_buf_line;
-
+    logic [$clog2(LINE_COUNT+2)-1:0 ] write_buf_line, next_write_buf_line ;
+    // TODO change naming cause buf_line indexes buf_file and write_buf_file is for tracking total lines in picture
+    logic [2:0] buf_line, next_buf_line;
+    logic first_line;
     // Sequential logic
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -81,10 +84,11 @@ module acc #(
             buf_line            <= 3'd1;  // Start at line1 as line0 is mirrored from line1
             buf_pixel_idx       <= 1;     // Start at index=1 as index=0 is a copy of index=1
             // Write pointers start from 0
-            write_buf_line      <= 0;
+            write_buf_line      <= 1; 
             write_buf_pixel_idx <= 1;
             write_word_addr     <= WRITEBACK_ADDR;  // Starting address for processed image (word address)
             line_top            <= 0;               // Initial top line
+            first_line          <= 1;               // For copying line1 into line0 (boundry condition)
         end else begin
             state               <= next_state;
             buf_line            <= next_buf_line;
@@ -95,7 +99,7 @@ module acc #(
             write_word_addr     <=next_write_word_addr; 
             line_top            <= next_line_top;
 
-            case (state)
+            case (state) // IF Initial load or load for extra line TODO can probably merge into one state TODO add last line copying
                 LOAD_INITIAL_LINES,
                 READ_NEW_LINE: begin
                   // Latch word into corresponding pixel in buffer
@@ -105,7 +109,8 @@ module acc #(
                   buf_file[buf_line][buf_pixel_idx + 3] <= dataR[31:24];
 
                   // If first line also record into the 0th (boundary condition)
-                  if(buf_line == 1) begin
+                  if(first_line == 1) begin
+                    first_line <= 0;
                     buf_file[buf_line-1][buf_pixel_idx + 0] <= dataR[7:0];
                     buf_file[buf_line-1][buf_pixel_idx + 1] <= dataR[15:8];
                     buf_file[buf_line-1][buf_pixel_idx + 2] <= dataR[23:16];
@@ -158,18 +163,19 @@ module acc #(
             end
             LOAD_INITIAL_LINES: begin
                 en = 1'b1;  // Keep memory enabled
+                next_word_addr = word_addr + 1; // Increment memory word address 
 
-                // If last word in line_buf increment line and if we were already writing into 2nd line go to next state
-                if(buf_pixel_idx >= LINE_LENGTH-3) begin // -3 because last idx will be 349
+                // If last word of the line increment line and if we were already writing into 2nd line go to next state
+                if(buf_pixel_idx >= LINE_LENGTH-3) begin // pixel index starts at 1, so we do -3 because last idx will be 349
                   if(buf_line == 2) begin
                     next_state = PROCESS_AND_WRITEBACK;
+                    next_word_addr = word_addr;
                   end 
-                  next_buf_pixel_idx = 1; // Reset pixel index for new line
-                  next_buf_line = buf_line + 1; // Increment buf_line after reading line, it will be used in READ_NEW_LINE
+                  next_buf_pixel_idx = 1;       // Reset pixel index for new line
+                  next_buf_line = buf_line + 1; // Go to next line, the same pointer is also used in READ_NEW_LINE
                 end else begin
                   next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
-                end
-                next_word_addr = word_addr + 1; // Increment memory word address      
+                end  
             end
             PROCESS_AND_WRITEBACK: begin
               //------------------------------------------------
@@ -179,29 +185,37 @@ module acc #(
               en = 1'b1;
               we = 1'b1;
 
-              // Pack 4 bytes into one word
+              // Pack 4 bytes into one word, for now just write back same picture 
               dataW = {
-                  buf_file[write_buf_line][write_buf_pixel_idx + 3],
-                  buf_file[write_buf_line][write_buf_pixel_idx + 2],
-                  buf_file[write_buf_line][write_buf_pixel_idx + 1],
-                  buf_file[write_buf_line][write_buf_pixel_idx + 0]
+                  buf_file[line_mid][write_buf_pixel_idx + 3],
+                  buf_file[line_mid][write_buf_pixel_idx + 2],
+                  buf_file[line_mid][write_buf_pixel_idx + 1],
+                  buf_file[line_mid][write_buf_pixel_idx + 0]
               };
               next_write_word_addr = write_word_addr + 1;
+              //------------------------------------------------
+              //        LOGIC FOR SAME PIXEL WRITEBACK
+              //------------------------------------------------
               // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
-              if (write_buf_pixel_idx >= LINE_LENGTH - 4) begin // -4 because last idx will be 348
-                  if (write_buf_line == LINE_COUNT - 1) begin
+              if (write_buf_pixel_idx >= LINE_LENGTH - 3) begin // -3 because last idx will be 348 (@rst write_buf_pixel_idx=1)
+                  if (write_buf_line == LINE_COUNT) begin
                       next_state = DONE;
-                  end else begin
-                      next_write_buf_line = write_buf_line + 1;
-                      next_write_buf_pixel_idx = 1; // TODO Won't need this when have processing
+                  end else begin                     
                       next_buf_line  = line_top;  // Prepare buf_line for READ_NEW_LINE
-                      next_state = READ_NEW_LINE;
+                      next_state = DELAY;
                   end
+                  next_write_buf_pixel_idx = 1;
+                  next_write_buf_line = write_buf_line + 1;
               end else begin
                   next_write_buf_pixel_idx = write_buf_pixel_idx + 4;
                   next_state = PROCESS_AND_WRITEBACK;
               end
-
+            end
+            DELAY:begin
+              en = 1'b1;
+              next_word_addr = word_addr + 1;
+              next_state = READ_NEW_LINE;
+              // Needed to finish write and let addr pointer jump to read location
             end
             READ_NEW_LINE: begin
               en = 1'b1;  // Enable memory
