@@ -11,7 +11,7 @@
 //             :
 //
 // ----------------------------------------------------------------------------//
-
+// TODO Check if boundries are generated correctly
 module acc #(
     parameter int LINE_LENGTH     = 352,    // pixels per line (must be multiple of 4 for 32-bit words)
     parameter int LINE_COUNT      = 288,    
@@ -78,7 +78,7 @@ module acc #(
 
 
 
-    logic first_line;
+    logic first_line, next_first_line;
 
     // Below signals for keeping track which line is in which buf_file index. The values will iterate as follows
     // line_top | line_mid | line_bot
@@ -116,6 +116,7 @@ module acc #(
             write_buf_pixel_idx <=next_write_buf_pixel_idx;
             write_word_addr     <=next_write_word_addr; 
             line_top            <= next_line_top;
+            first_line          <= next_first_line;
 
             case (state)
                 LOAD_INITIAL_LINES,
@@ -128,7 +129,6 @@ module acc #(
 
                   // If first line also record into the 0th (boundary condition)
                   if(first_line == 1) begin
-                    first_line <= 0;
                     buf_file[buf_idx-1][buf_pixel_idx + 0] <= dataR[7:0];
                     buf_file[buf_idx-1][buf_pixel_idx + 1] <= dataR[15:8];
                     buf_file[buf_idx-1][buf_pixel_idx + 2] <= dataR[23:16];
@@ -164,13 +164,13 @@ module acc #(
         dataW      = 32'd0;
         finish     = 1'b0;
         next_word_addr            = word_addr;
-        next_buf_idx             = buf_idx;
+        next_buf_idx              = buf_idx;
         next_buf_pixel_idx        = buf_pixel_idx;
         next_line_top             = line_top;
-        next_img_line_idx       = img_line_idx;
+        next_img_line_idx         = img_line_idx;
         next_write_buf_pixel_idx  = write_buf_pixel_idx;
         next_write_word_addr      = write_word_addr;
-
+        next_first_line           = first_line;
         case (state)
             IDLE: begin
                 if (start) begin
@@ -185,6 +185,7 @@ module acc #(
 
                 // If last word of the line increment line and if we were already writing into 2nd line go to next state
                 if(buf_pixel_idx >= LINE_LENGTH-3) begin // pixel index starts at 1, so we do -3 because last idx will be 349
+                  next_first_line = 0;
                   if(buf_idx == 2) begin
                     next_state = PROCESS_AND_WRITEBACK;
                     next_word_addr = word_addr;
