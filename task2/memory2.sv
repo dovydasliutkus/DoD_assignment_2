@@ -98,13 +98,13 @@ module memory2 #(
 
   // Trigger dumping of processed image to file
   initial begin
-    int fd;
+    int fd, fd_all;
     wait (dump_image) begin
         fd = $fopen (save_file_name, "w");
         $fwrite(fd, "P2\n");
         $fwrite(fd, "# Created by memory2 module\n");
         $fwrite(fd, "%0d %0d\n", width, height);
-        $fwrite(fd, "255\n");
+        // $fwrite(fd, "255\n");
         for (int i = (width * height)/4; i < (width * height)/2; i++) begin
             for (int j = 0; j < 4; j++) begin
                 $fwrite(fd, "%0d\n", memory[i][8*j+:8]);
@@ -112,6 +112,22 @@ module memory2 #(
         end
         $fclose(fd);
         $display("Image dumped to %s", save_file_name);
+        
+        // --- Dump full memory content ---
+        fd_all = $fopen({save_file_name, "_full.txt"}, "w");
+        if (fd_all == 0) begin
+            $error("Failed to open %s_full.txt for writing", save_file_name);
+            $finish;
+        end
+        $fwrite(fd_all, "# Full memory dump\n");
+        for (int i = 0; i < width * height; i++) begin
+            for (int j = 0; j < 4; j++) begin
+                $fwrite(fd_all, "%0d\n", memory[i][8*j+:8]);
+            end
+        end
+        $fclose(fd_all);
+        $display("Full memory dumped to %s_full.txt", save_file_name);
+
         $finish;
     end
   end
