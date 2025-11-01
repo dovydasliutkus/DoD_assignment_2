@@ -60,7 +60,7 @@ module acc #(
     } state_t;
 
     state_t state, next_state;
-
+    
     // Buffer file for three lines of image LINE_LENGTH+2=354 lines for mirrored border pixels
     logic [7:0]   buf_file [0:2][0:LINE_LENGTH+1];
     
@@ -85,10 +85,21 @@ module acc #(
     //     2    |     0    |     1
     // This mechanism is so we always write to the line we're don't need anymore without moving anything inside the buffer
     logic [1:0]   line_top, next_line_top, line_mid, line_bot; 
-
+    
     // Will be overwriting oldest line (line_bot)
     assign line_mid = (line_top + 1) % 3;
     assign line_bot = (line_top + 2) % 3;
+
+    //------------------------------------------------------------
+    // Working buffer (3 rows × 6 columns)
+    // Holds a small 3x6 window extracted from buf_file
+    //------------------------------------------------------------
+    logic [7:0]   work_buffer [0:17];
+    logic [31:0]  output_word;
+    logic [$clog2(LINE_LENGTH+2)-1:0] work_pixel_idx;
+
+    // Try using same pixel index pointer for processing
+    assign work_pixel_idx = buf_pixel_idx;
 
     // Multiplex address based on read/write
     assign addr = we ? write_word_addr : word_addr;
@@ -185,8 +196,8 @@ module acc #(
                     next_state     = PROCESS_AND_WRITEBACK;
                     next_word_addr = word_addr;
                   end 
-                  next_buf_pixel_idx = 1;       // Reset pixel index for new line
-                  next_buf_line_sel = buf_line_sel + 1; // Go to next line, the same pointer is also used in READ_NEW_LINE
+                  next_buf_pixel_idx  = 1;                // Reset pixel index for new line
+                  next_buf_line_sel   = buf_line_sel + 1; // Go to next line, the same pointer is also used in READ_NEW_LINE
                 end else begin
                   next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
                 end  
@@ -199,12 +210,12 @@ module acc #(
               en = 1'b1;
               we = 1'b1;
 
-              // Pack 4 bytes into one word, for now just write back same picture 
+              // Prepare processed word to write into memory
               dataW = {
-                  buf_file[line_mid][buf_pixel_idx + 3],
-                  buf_file[line_mid][buf_pixel_idx + 2],
-                  buf_file[line_mid][buf_pixel_idx + 1],
-                  buf_file[line_mid][buf_pixel_idx + 0]
+                output_word[31:24],
+                output_word[23:16],
+                output_word[15:8],
+                output_word[7:0]
               };
               next_write_word_addr = write_word_addr + 1;
 
@@ -227,7 +238,7 @@ module acc #(
             DELAY:begin
               // Needed to finish write and let addr pointer jump to read location
               en = 1'b1;
-              next_word_addr = word_addr + 1;
+              next_word_addr = word_addr + 1;       
               next_state = READ_NEW_LINE;
             end
             READ_NEW_LINE: begin
@@ -237,8 +248,12 @@ module acc #(
                 next_state = PROCESS_AND_WRITEBACK;
                 next_buf_line_sel   = 1; 
                 next_buf_pixel_idx  = 1; 
-                // Update what is top line in buffer file
-                next_line_top = (line_top + 1) % 3;
+                next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
+
+                // If last line re-read same line text time (boundry condition)
+                if(img_line_count == LINE_COUNT - 1)begin
+                  next_word_addr = 16'd25256;   // TODO Make expresion instead of magic number
+                end 
               end else begin
                 next_state          = READ_NEW_LINE;
                 next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
@@ -254,6 +269,67 @@ module acc #(
             default: next_state = IDLE;
         endcase
     end
+
+    //------------------------------------------------------------
+    // BUILD THE WORK BUFFER (3 rows × 6 pixels)
+    // Extracts a 3x6 region centered around work_pixel_idx
+    //------------------------------------------------------------
+    genvar i;
+    generate
+        for (i = 0; i < 6; i = i + 1) begin
+            assign work_buffer[i]       = buf_file[line_top][work_pixel_idx - 1 + i];
+            assign work_buffer[i + 6]   = buf_file[line_mid][work_pixel_idx - 1 + i];
+            assign work_buffer[i + 12]  = buf_file[line_bot][work_pixel_idx - 1 + i];
+        end
+    endgenerate
+
+    //------------------------------------------------------------
+    // SOBEL FILTER CALCULATION (pixels 1 → 4 of the mid line)
+    // Computes Dx, Dy and approximate magnitude |D| = |Dx| + |Dy|
+    //------------------------------------------------------------
+    logic [7:0] sobel_result [1:4];
+
+    generate
+        for (i = 1; i <= 4; i = i + 1) begin : sobel_calc
+            // 3x3 pixel window
+            wire [7:0] s11 = work_buffer[i - 1];
+            wire [7:0] s12 = work_buffer[i];
+            wire [7:0] s13 = work_buffer[i + 1];
+            wire [7:0] s21 = work_buffer[6 + i - 1];
+            wire [7:0] s22 = work_buffer[6 + i];
+            wire [7:0] s23 = work_buffer[6 + i + 1];
+            wire [7:0] s31 = work_buffer[12 + i - 1];
+            wire [7:0] s32 = work_buffer[12 + i];
+            wire [7:0] s33 = work_buffer[12 + i + 1];
+
+            // Sobel horizontal gradient (Dx)
+            wire signed [10:0] Dx =
+                  $signed({1'b0, s13}) - $signed({1'b0, s11})
+                + (($signed({1'b0, s23}) - $signed({1'b0, s21})) <<< 1)
+                + $signed({1'b0, s33}) - $signed({1'b0, s31});
+
+            // Sobel vertical gradient (Dy)
+            wire signed [10:0] Dy =
+                  $signed({1'b0, s11}) - $signed({1'b0, s31})
+                + (($signed({1'b0, s12}) - $signed({1'b0, s32})) <<< 1)
+                + $signed({1'b0, s13}) - $signed({1'b0, s33});
+
+            // Absolute values
+            wire [10:0] absDx = Dx[10] ? -Dx : Dx;
+            wire [10:0] absDy = Dy[10] ? -Dy : Dy;
+
+            // Approximate gradient magnitude
+            wire [11:0] D = absDx + absDy;
+
+            // Clamp to 8 bits
+            assign sobel_result[i] = (D > 12'd255) ? 8'd255 : D[7:0];
+        end
+    endgenerate
+
+    //------------------------------------------------------------
+    // PACK OUTPUT WORD (4 × 8-bit Sobel results)
+    //------------------------------------------------------------
+    assign output_word = {sobel_result[4], sobel_result[3], sobel_result[2], sobel_result[1]};
 endmodule
 
 
