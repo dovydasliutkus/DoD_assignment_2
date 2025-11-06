@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Site BuildName="Win32-MSBuild"
+	BuildStamp="20251106-0035-Experimental"
+	Name="VivobookS16"
+	Generator="ctest-3.31.0-rc3"
+	CompilerName="C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.41.34120/bin/Hostx64/x64/cl.exe"
+	CompilerVersion="19.41.34123.0"
+	OSName="Windows"
+	Hostname="VivobookS16"
+	OSRelease=" Professional"
+	OSVersion=" (Build 26100)"
+	OSPlatform="AMD64"
+	Is64Bits="1"
+	VendorString="AuthenticAMD"
+	VendorID="Advanced Micro Devices"
+	FamilyID="15"
+	ModelID="4"
+	ModelName="AMD Ryzen 5 7535HS with Radeon Graphics        "
+	ProcessorCacheSize="64"
+	NumberOfLogicalCPU="12"
+	NumberOfPhysicalCPU="6"
+	TotalVirtualMemory="34103"
+	TotalPhysicalMemory="15611"
+	LogicalProcessorsPerPhysical="2"
+	ProcessorClockFrequency="3293"
+	>
+	<Testing>
+		<StartDateTime>Nov 06 08:30 K[NON-UTF-8-BYTE-0xF6]z[NON-UTF-8-BYTE-0xE9]p-eur[NON-UTF-8-BYTE-0xF3]pai t[NON-UTF-8-BYTE-0xE9]li id[NON-UTF-8-BYTE-0xF5]</StartDateTime>
+		<StartTestTime>1762414205</StartTestTime>
+		<TestList/>
+		<EndDateTime>Nov 06 08:30 K[NON-UTF-8-BYTE-0xF6]z[NON-UTF-8-BYTE-0xE9]p-eur[NON-UTF-8-BYTE-0xF3]pai t[NON-UTF-8-BYTE-0xE9]li id[NON-UTF-8-BYTE-0xF5]</EndDateTime>
+		<EndTestTime>1762414205</EndTestTime>
+		<ElapsedMinutes>0</ElapsedMinutes>
+	</Testing>
+</Site>

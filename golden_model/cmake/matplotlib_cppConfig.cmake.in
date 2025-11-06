@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+# This is a minimal config file that includes the exported targets.
+# It is configured at build-time by configure_package_config_file().
+
+set(matplotlib_cpp_FOUND TRUE)
+
+include("${CMAKE_CURRENT_LIST_DIR}/matplotlib_cppTargets.cmake")

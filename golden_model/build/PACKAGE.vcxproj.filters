@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="I:\DTU\02203_designofdigitalsystems\sobel\build\CMakeFiles\73a26d4bbb4b21ed22514a0267e5e64d\PACKAGE_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{BCB594D6-47DE-3B66-83C5-CDB31CC99868}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

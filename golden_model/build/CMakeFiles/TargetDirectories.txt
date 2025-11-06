@@ -1,0 +1,10 @@
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/Experimental.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/Nightly.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/Continuous.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/NightlyMemoryCheck.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/opencvtest_main.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/PACKAGE.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/RUN_TESTS.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/INSTALL.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/ALL_BUILD.dir
+I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/ZERO_CHECK.dir
