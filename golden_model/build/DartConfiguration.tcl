@@ -4,8 +4,8 @@
 
 
 # Configuration directories and files
-SourceDirectory: I:/DTU/02203_designofdigitalsystems/sobel
-BuildDirectory: I:/DTU/02203_designofdigitalsystems/sobel/build
+SourceDirectory: I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model
+BuildDirectory: I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build
 
 # Where to place the cost data store
 CostDataFile: 
@@ -27,7 +27,7 @@ SubmitInactivityTimeout:
 NightlyStartTime: 00:00:00 EDT
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "C:/Program Files/CMake/bin/cmake.exe" "I:/DTU/02203_designofdigitalsystems/sobel"
+ConfigureCommand: "C:/Program Files/CMake/bin/cmake.exe" "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model"
 MakeCommand: "C:\Program Files\CMake\bin\cmake.exe" --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 

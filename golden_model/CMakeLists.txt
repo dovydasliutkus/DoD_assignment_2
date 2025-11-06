@@ -12,6 +12,33 @@ add_executable(opencvtest_main main.cpp)
 set_target_properties(opencvtest_main PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
 target_link_libraries(opencvtest_main ${OpenCV_LIBS})
 
+# On Windows: after build, copy any OpenCV DLLs found next to the linked libraries
+# into the executable output directory (Release/Debug). This helps producing a
+# runnable folder (exe + required DLLs) without requiring the user to install
+# OpenCV in PATH or the Visual C++ redistributable immediately.
+if(WIN32)
+  # Collect DLLs that live in the same directories as the OpenCV libraries
+  set(_opencv_dlls)
+  foreach(_lib ${OpenCV_LIBS})
+    if(EXISTS "${_lib}")
+      get_filename_component(_libdir ${_lib} DIRECTORY)
+      file(GLOB _dlls_in_dir CONFIGURE_DEPENDS "${_libdir}/*.dll")
+      foreach(_d ${_dlls_in_dir})
+        list(APPEND _opencv_dlls "${_d}")
+      endforeach()
+    endif()
+  endforeach()
+
+  # Add a post-build copy command for each discovered DLL so they end up next
+  # to the produced executable (works with multi-config generators).
+  foreach(_dll ${_opencv_dlls})
+    add_custom_command(TARGET opencvtest_main POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_dll}" $<TARGET_FILE_DIR:opencvtest_main>
+      COMMENT "Copying ${_dll} to output folder"
+    )
+  endforeach()
+endif()
+
 
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

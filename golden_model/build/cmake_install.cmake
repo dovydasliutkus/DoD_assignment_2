@@ -1,4 +1,4 @@
-# Install script for directory: I:/DTU/02203_designofdigitalsystems/sobel
+# Install script for directory: I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -33,14 +33,14 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include" TYPE FILE FILES "I:/DTU/02203_designofdigitalsystems/sobel/matplotlibcpp.h")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include" TYPE FILE FILES "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/matplotlibcpp.h")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake/matplotlib_cppTargets.cmake")
     file(DIFFERENT _cmake_export_file_changed FILES
          "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake/matplotlib_cppTargets.cmake"
-         "I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/Export/3f1ac978750cdcf3e610322786e2ec96/matplotlib_cppTargets.cmake")
+         "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build/CMakeFiles/Export/3f1ac978750cdcf3e610322786e2ec96/matplotlib_cppTargets.cmake")
     if(_cmake_export_file_changed)
       file(GLOB _cmake_old_config_files "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake/matplotlib_cppTargets-*.cmake")
       if(_cmake_old_config_files)
@@ -53,17 +53,17 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
     endif()
     unset(_cmake_export_file_changed)
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake" TYPE FILE FILES "I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/Export/3f1ac978750cdcf3e610322786e2ec96/matplotlib_cppTargets.cmake")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake" TYPE FILE FILES "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build/CMakeFiles/Export/3f1ac978750cdcf3e610322786e2ec96/matplotlib_cppTargets.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake" TYPE FILE FILES "I:/DTU/02203_designofdigitalsystems/sobel/build/matplotlib_cppConfig.cmake")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/matplotlib_cpp/cmake" TYPE FILE FILES "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build/matplotlib_cppConfig.cmake")
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "I:/DTU/02203_designofdigitalsystems/sobel/build/install_local_manifest.txt"
+  file(WRITE "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
 if(CMAKE_INSTALL_COMPONENT)
@@ -79,6 +79,6 @@ else()
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "I:/DTU/02203_designofdigitalsystems/sobel/build/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

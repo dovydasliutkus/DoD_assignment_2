@@ -1,6 +1,6 @@
-^I:\DTU\02203_DESIGNOFDIGITALSYSTEMS\SOBEL\CMAKELISTS.TXT
+^I:\DTU\02203_DESIGNOFDIGITALSYSTEMS\DOD_ASSIGNMENT_2\GOLDEN_MODEL\CMAKELISTS.TXT
 setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -SI:/DTU/02203_designofdigitalsystems/sobel -BI:/DTU/02203_designofdigitalsystems/sobel/build --check-stamp-file I:/DTU/02203_designofdigitalsystems/sobel/build/CMakeFiles/generate.stamp
+"C:\Program Files\CMake\bin\cmake.exe" -SI:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model -BI:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build --check-stamp-file I:/DTU/02203_designofdigitalsystems/DoD_assignment_2/golden_model/build/CMakeFiles/generate.stamp
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
