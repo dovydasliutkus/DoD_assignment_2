@@ -1,7 +1,7 @@
 # compare_pgm_data.py
 
-file1 = "pic1_result.pgm"
-file2 = "pic1.pgm"
+file1 = "pattern_result.pgm"
+file2 = "pattern_sobel.pgm"
 
 mismatch_limit = 5  # show first 5 mismatches
 mismatches = 0
