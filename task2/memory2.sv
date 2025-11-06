@@ -24,6 +24,7 @@ function automatic ram_type read_pgm_file(string load_file_name, ref int width, 
   string _line;
   string p2 = "P2";
   int fd;
+  int max_val;
   ram_type memory;
 
   // Check if file is provided
@@ -51,7 +52,10 @@ function automatic ram_type read_pgm_file(string load_file_name, ref int width, 
     $display("Error: Image size larger than expected (50688 pixels)");
     $finish;
   end
-
+  // ADDED PART ----------------
+ 
+  $fscanf(fd, "%d", max_val);
+  //-----------------------------
   // Read pixel data and pack into memory words (little-endian)
   for (int i = 0; i < (width * height)/4; i++) begin
     byte pixels [4];
@@ -104,7 +108,7 @@ module memory2 #(
         $fwrite(fd, "P2\n");
         $fwrite(fd, "# Created by memory2 module\n");
         $fwrite(fd, "%0d %0d\n", width, height);
-        // $fwrite(fd, "255\n");
+        $fwrite(fd, "255\n");
         for (int i = (width * height)/4; i < (width * height)/2; i++) begin
             for (int j = 0; j < 4; j++) begin
                 $fwrite(fd, "%0d\n", memory[i][8*j+:8]);
