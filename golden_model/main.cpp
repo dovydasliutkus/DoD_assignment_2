@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 
 int main(int argc, char** argv)
 {
@@ -64,10 +65,30 @@ int main(int argc, char** argv)
         std::filesystem::path inputPath(argv[1]);
         std::string outName = inputPath.stem().string() + std::string("_sobel.pgm");
         std::filesystem::path outPath = exeDir / outName;
-        if (cv::imwrite(outPath.string(), mag8U)) {
-            std::cout << "Saved result to: " << outPath.string() << std::endl;
+        // Write ASCII (P2) PGM with a custom header and decimal pixel values
+        // Header required by the user:
+        // P2
+        // # Created by golden model
+        // <width> <height>
+        std::ofstream ofs(outPath, std::ios::out);
+        if (!ofs.is_open()) {
+            std::cerr << "Failed to open output file for writing: " << outPath.string() << std::endl;
         } else {
-            std::cerr << "Failed to save result to: " << outPath.string() << std::endl;
+            // Write header
+            ofs << "P2\n";
+            ofs << "# Created by golden model\n";
+            ofs << mag8U.cols << " " << mag8U.rows << "\n";
+
+            // Write pixel values one per line in decimal (row-major order)
+            for (int y = 0; y < mag8U.rows; ++y) {
+                for (int x = 0; x < mag8U.cols; ++x) {
+                    int v = static_cast<int>(mag8U.at<uchar>(y, x));
+                    ofs << v << '\n';
+                }
+            }
+
+            ofs.close();
+            std::cout << "Saved result to: " << outPath.string() << std::endl;
         }
     } catch (const std::exception &e) {
         std::cerr << "Could not determine executable path: " << e.what() << std::endl;

@@ -20,14 +20,53 @@ if(WIN32)
   # Collect DLLs that live in the same directories as the OpenCV libraries
   set(_opencv_dlls)
   foreach(_lib ${OpenCV_LIBS})
+    # If the library is an imported target, try to get its imported location
+    if(TARGET ${_lib})
+      # Try common IMPORTED_LOCATION properties (multi-config support)
+      get_target_property(_imp_loc ${_lib} IMPORTED_LOCATION_RELEASE)
+      if(NOT _imp_loc)
+        get_target_property(_imp_loc ${_lib} IMPORTED_LOCATION)
+      endif()
+      if(_imp_loc)
+        get_filename_component(_libdir ${_imp_loc} DIRECTORY)
+        file(GLOB _dlls_in_dir CONFIGURE_DEPENDS "${_libdir}/*.dll")
+        foreach(_d ${_dlls_in_dir})
+          list(APPEND _opencv_dlls "${_d}")
+        endforeach()
+        continue()
+      endif()
+    endif()
+
+    # If OpenCV_LIBS entry is a path, try to use its directory
     if(EXISTS "${_lib}")
       get_filename_component(_libdir ${_lib} DIRECTORY)
       file(GLOB _dlls_in_dir CONFIGURE_DEPENDS "${_libdir}/*.dll")
       foreach(_d ${_dlls_in_dir})
         list(APPEND _opencv_dlls "${_d}")
       endforeach()
+      continue()
     endif()
   endforeach()
+
+  # Fallback: search common locations relative to OpenCV_DIR (if set)
+  if(DEFINED OpenCV_DIR)
+    # common layouts: <build>/lib/cmake/opencv4 -> binaries in <build>/bin or install/bin
+    get_filename_component(_ocv_dir ${OpenCV_DIR} DIRECTORY)
+    set(_search_dirs
+      "${OpenCV_DIR}"
+      "${_ocv_dir}/bin"
+      "${_ocv_dir}/../bin"
+      "${_ocv_dir}/../../bin"
+      "${_ocv_dir}/../x64/vc*/bin"
+      "${_ocv_dir}/x64/vc*/bin"
+    )
+    foreach(_sd ${_search_dirs})
+      file(GLOB _dlls_from_ocv CONFIGURE_DEPENDS "${_sd}/*.dll")
+      foreach(_d ${_dlls_from_ocv})
+        list(APPEND _opencv_dlls "${_d}")
+      endforeach()
+    endforeach()
+  endif()
 
   # Add a post-build copy command for each discovered DLL so they end up next
   # to the produced executable (works with multi-config generators).
