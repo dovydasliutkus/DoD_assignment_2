@@ -11,8 +11,7 @@
 //             :
 //
 // ----------------------------------------------------------------------------//
-// TODO Check if boundries are generated correctly
-// TODO Make first_line logic more clear
+// TODO make first line boundry copying in combinatorial part instead of always_ff (look at how last_line is done)
 module acc #(
     parameter int LINE_LENGTH     = 352,    // pixels per line (must be multiple of 4 for 32-bit words)
     parameter int LINE_COUNT      = 288,    
@@ -76,7 +75,7 @@ module acc #(
     // Image line index for tracking how may lines have been written
     logic [$clog2(LINE_COUNT+2)-1:0 ] img_line_count, next_img_line_count ;
 
-    logic first_line, next_first_line;
+    logic first_line, next_first_line, last_line, next_last_line;
 
     // Below signals for keeping track which line is in which buf_file index. The values will iterate as follows
     // line_top | line_mid | line_bot
@@ -115,6 +114,7 @@ module acc #(
             write_word_addr <= WRITEBACK_ADDR;  // Starting address for processed image (word address)
             line_top        <= 0;               // Initial top line
             first_line      <= 1;               // For copying line1 into line0 (boundry condition)
+            last_line       <= 0;
         end else begin
             state           <= next_state;
             buf_line_sel    <= next_buf_line_sel;
@@ -124,6 +124,7 @@ module acc #(
             write_word_addr <= next_write_word_addr; 
             line_top        <= next_line_top;
             first_line      <= next_first_line;
+            last_line       <= next_last_line;
 
             case (state)
                 LOAD_INITIAL_LINES,
@@ -177,6 +178,7 @@ module acc #(
         next_img_line_count   = img_line_count;
         next_write_word_addr  = write_word_addr;
         next_first_line       = first_line;
+        next_last_line        = last_line;
         case (state)
             IDLE: begin
                 if (start) begin
@@ -203,9 +205,7 @@ module acc #(
                 end  
             end
             PROCESS_AND_WRITEBACK: begin
-              //------------------------------------------------
-              //              INSERT PROCESSING HERE
-              //------------------------------------------------
+
               // For now only write back the same values
               en = 1'b1;
               we = 1'b1;
@@ -222,8 +222,13 @@ module acc #(
               //       BELOW: LOGIC FOR SAME PIXEL WRITEBACK
               // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
               if (buf_pixel_idx >= LINE_LENGTH - 3) begin // -3 because last idx will be 348 (@rst write_buf_pixel_idx=1)
-                  if (img_line_count == LINE_COUNT) begin
-                      next_state = DONE;
+                  if(img_line_count == LINE_COUNT) begin
+                    next_state = DONE;
+                  end else if (img_line_count == LINE_COUNT-1) begin
+                      // For last line repeat PROCESS_AND_WRITEBACK no READ_NEW_LINE (boundry condition)
+                      next_last_line = 1;
+                      next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
+                      next_state = PROCESS_AND_WRITEBACK;
                   end else begin                     
                       next_buf_line_sel  = line_top;  // Prepare buf_line_sel for READ_NEW_LINE
                       next_state = DELAY;
@@ -250,10 +255,10 @@ module acc #(
                 next_buf_pixel_idx  = 1; 
                 next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
 
-                // If last line re-read same line text time (boundry condition)
-                if(img_line_count == LINE_COUNT - 1)begin
-                  next_word_addr = 16'd25256;   // TODO Make expresion instead of magic number
-                end 
+                // // If last line re-read same line text time (boundry condition)
+                // if(img_line_count == LINE_COUNT - 1)begin
+                //   next_word_addr = 16'd25256;   // TODO Make expresion instead of magic number
+                // end 
               end else begin
                 next_state          = READ_NEW_LINE;
                 next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
@@ -279,7 +284,8 @@ module acc #(
         for (i = 0; i < 6; i = i + 1) begin
             assign work_buffer[i]       = buf_file[line_top][work_pixel_idx - 1 + i];
             assign work_buffer[i + 6]   = buf_file[line_mid][work_pixel_idx - 1 + i];
-            assign work_buffer[i + 12]  = buf_file[line_bot][work_pixel_idx - 1 + i];
+            // If last line use middle line (boundary condition )
+            assign work_buffer[i + 12]  = last_line ? buf_file[line_mid][work_pixel_idx - 1 + i] : buf_file[line_bot][work_pixel_idx - 1 + i];
         end
     endgenerate
 
