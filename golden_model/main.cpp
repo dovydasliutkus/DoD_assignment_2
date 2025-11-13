@@ -25,13 +25,63 @@ int main(int argc, char** argv)
     const int border = (ksize - 1) / 2; // number of pixels to pad on each side
 
     // Create a padded image by copying the edge pixels (replicate border)
-    cv::Mat padded;
-    cv::copyMakeBorder(imgGray, padded, border, border, border, border, cv::BORDER_REPLICATE);
+    // Implemented manually according to the provided diagram: copy edge
+    // pixels outward for the border and copy corner pixels into corner regions.
+    cv::Mat padded(imgGray.rows + 2 * border, imgGray.cols + 2 * border, imgGray.type());
+    // Fill center with original image
+    imgGray.copyTo(padded(cv::Rect(border, border, imgGray.cols, imgGray.rows)));
 
-    // Apply Sobel operator on the padded image (we'll crop the border later)
+    // Fill left and right borders by replicating first/last columns
+    for (int y = 0; y < imgGray.rows; ++y) {
+        uchar vLeft = imgGray.at<uchar>(y, 0);
+        uchar vRight = imgGray.at<uchar>(y, imgGray.cols - 1);
+        for (int x = 0; x < border; ++x) {
+            padded.at<uchar>(y + border, x) = vLeft;
+            padded.at<uchar>(y + border, imgGray.cols + border + x) = vRight;
+        }
+    }
+
+    // Fill top and bottom borders by replicating first/last rows (center area)
+    for (int x = 0; x < imgGray.cols; ++x) {
+        uchar vTop = imgGray.at<uchar>(0, x);
+        uchar vBottom = imgGray.at<uchar>(imgGray.rows - 1, x);
+        for (int y = 0; y < border; ++y) {
+            padded.at<uchar>(y, border + x) = vTop;
+            padded.at<uchar>(imgGray.rows + border + y, border + x) = vBottom;
+        }
+    }
+
+    // Fill corners by replicating the corner pixels
+    uchar tl = imgGray.at<uchar>(0, 0);
+    uchar tr = imgGray.at<uchar>(0, imgGray.cols - 1);
+    uchar bl = imgGray.at<uchar>(imgGray.rows - 1, 0);
+    uchar br = imgGray.at<uchar>(imgGray.rows - 1, imgGray.cols - 1);
+    for (int y = 0; y < border; ++y) {
+        for (int x = 0; x < border; ++x) {
+            padded.at<uchar>(y, x) = tl;
+            padded.at<uchar>(y, imgGray.cols + border + x) = tr;
+            padded.at<uchar>(imgGray.rows + border + y, x) = bl;
+            padded.at<uchar>(imgGray.rows + border + y, imgGray.cols + border + x) = br;
+        }
+    }
+
+    // Apply Sobel-like kernels from the assignment on the padded image
+    // Gx = [ -1  0 +1
+    //        -2  0 +2
+    //        -1  0 +1 ]
+    // Gy = [ +1 +2 +1
+    //         0  0  0
+    //        -1 -2 -1 ]
+    // We implement these explicitly using filter2D with CV_64F output.
     cv::Mat sobelXpad, sobelYpad;
-    cv::Sobel(padded, sobelXpad, CV_64F, 1, 0, ksize, 1, 0, cv::BORDER_DEFAULT);
-    cv::Sobel(padded, sobelYpad, CV_64F, 0, 1, ksize, 1, 0, cv::BORDER_DEFAULT);
+    cv::Mat kernelX = (cv::Mat_<double>(3,3) << -1, 0, 1,
+                                               -2, 0, 2,
+                                               -1, 0, 1);
+    cv::Mat kernelY = (cv::Mat_<double>(3,3) <<  1, 2, 1,
+                                                0, 0, 0,
+                                               -1,-2,-1);
+    cv::filter2D(padded, sobelXpad, CV_64F, kernelX, cv::Point(-1,-1), 0, cv::BORDER_DEFAULT);
+    cv::filter2D(padded, sobelYpad, CV_64F, kernelY, cv::Point(-1,-1), 0, cv::BORDER_DEFAULT);
 
     // Compute gradient magnitude — use sum of absolute gradients
     // (|Gx| + |Gy|) instead of sqrt(Gx^2 + Gy^2)
@@ -65,6 +115,25 @@ int main(int argc, char** argv)
         std::filesystem::path inputPath(argv[1]);
         std::string outName = inputPath.stem().string() + std::string("_sobel.pgm");
         std::filesystem::path outPath = exeDir / outName;
+        // Also save the padded image (with replicated border) for inspection
+        std::string paddedName = inputPath.stem().string() + std::string("_padded.pgm");
+        std::filesystem::path paddedPath = exeDir / paddedName;
+        std::ofstream pofs(paddedPath, std::ios::out);
+        if (!pofs.is_open()) {
+            std::cerr << "Failed to open padded output file for writing: " << paddedPath.string() << std::endl;
+        } else {
+            pofs << "P2\n";
+            pofs << "# Created by golden model (padded)\n";
+            pofs << padded.cols << " " << padded.rows << "\n\n";
+            for (int y = 0; y < padded.rows; ++y) {
+                for (int x = 0; x < padded.cols; ++x) {
+                    int v = static_cast<int>(padded.at<uchar>(y, x));
+                    pofs << v << '\n';
+                }
+            }
+            pofs.close();
+            std::cout << "Saved padded image to: " << paddedPath.string() << std::endl;
+        }
         // Write ASCII (P2) PGM with a custom header and decimal pixel values
         // Header required by the user:
         // P2
@@ -78,6 +147,7 @@ int main(int argc, char** argv)
             ofs << "P2\n";
             ofs << "# Created by golden model\n";
             ofs << mag8U.cols << " " << mag8U.rows << "\n";
+            ofs << "255\n"; // Max pixel value
 
             // Write pixel values one per line in decimal (row-major order)
             for (int y = 0; y < mag8U.rows; ++y) {
