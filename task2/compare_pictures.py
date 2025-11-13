@@ -54,6 +54,8 @@ files = [
     r"E:\UserData\Desktop\Term1\design_of_digital\assignment2\DoD_assignment_2\task2\golden\pattern_sobel.pgm",
     r"E:\UserData\Desktop\Term1\design_of_digital\assignment2\DoD_assignment_2\other_images\systemverilog_result.pgm",
     r"E:\UserData\Desktop\Term1\design_of_digital\assignment2\DoD_assignment_2\task2\golden\systemverilog_sobel.pgm",
+    r"E:\UserData\Desktop\Term1\design_of_digital\assignment2\DoD_assignment_2\other_images\pic1_result.pgm",
+    r"E:\UserData\Desktop\Term1\design_of_digital\assignment2\DoD_assignment_2\task2\golden\pic1_sobel.pgm",
 ]
 
 mismatch_limit = 5  # show first 5 mismatches
