@@ -99,7 +99,7 @@ module acc #(
     logic [$clog2(LINE_LENGTH+2)-1:0] work_pixel_idx;
 
     // Try using same pixel index pointer for processing
-    assign work_pixel_idx = buf_pixel_idx;
+    assign work_pixel_idx = processed_pixel_idx;
 
     // Multiplex address based on read/write
     assign addr = we ? write_word_addr : word_addr;
@@ -199,7 +199,7 @@ module acc #(
                   next_first_line = 0;
                   if(buf_line_sel == 2) begin
                     next_state     = PROCESS_AND_WRITEBACK;
-                    next_word_addr = word_addr;
+                    next_word_addr = word_addr - 1;
                     next_save_to_buf = 0;
                   end 
                   next_buf_pixel_idx  = 1;                // Reset pixel index for new line
@@ -233,10 +233,12 @@ module acc #(
                       next_last_line = 1;
                       next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
                       next_state = PROCESS_AND_WRITEBACK;
+                      next_processed_pixel_idx = 1;
                   end else begin                     
                       next_buf_line_sel  = line_top;  // Prepare buf_line_sel for READ_NEW_LINE
                       next_state = DELAY;
                       next_word_addr = word_addr + 1;
+                      next_processed_pixel_idx = 1;
                   end
                   next_buf_pixel_idx = 1;
                   next_img_line_count = img_line_count + 1;
