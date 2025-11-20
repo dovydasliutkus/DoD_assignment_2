@@ -9,7 +9,7 @@ module testbench;
     logic clk;
     logic reset;
     logic StopSimulation = 0;
-    localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/pic1.pgm"; // Path to the input PGM file
+    localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/kaleidoscope.pgm"; // Path to the input PGM file
 
     // Accelerator and memory signals
     logic [15:0] addr;
