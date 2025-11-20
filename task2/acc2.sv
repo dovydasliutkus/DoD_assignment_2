@@ -138,29 +138,15 @@ module acc #(
                   buf_file[buf_line_sel][buf_pixel_idx + 2] <= dataR[23:16];
                   buf_file[buf_line_sel][buf_pixel_idx + 3] <= dataR[31:24];
 
-                  // If first line also record into the 0th (boundary condition)
-                  if(first_line == 1) begin
-                    buf_file[buf_line_sel-1][buf_pixel_idx + 0] <= dataR[7:0];
-                    buf_file[buf_line_sel-1][buf_pixel_idx + 1] <= dataR[15:8];
-                    buf_file[buf_line_sel-1][buf_pixel_idx + 2] <= dataR[23:16];
-                    buf_file[buf_line_sel-1][buf_pixel_idx + 3] <= dataR[31:24];
-                  end
-
                   // If first word in line copy least-siginificant byte (pixel) into 0th index (boundary condition)
                   if(buf_pixel_idx == 1)begin
                     buf_file[buf_line_sel][buf_pixel_idx-1] <= dataR[7:0];
-                    // If first line also repeat for line0
-                    if(first_line == 1)
-                      buf_file[buf_line_sel-1][buf_pixel_idx-1] <= dataR[7:0];
                   end
                   // If last word in line copy most-siginificant byte into last index (boundary condition)
                   if(buf_pixel_idx == LINE_LENGTH-3)begin
                     buf_file[buf_line_sel][buf_pixel_idx+4] <= dataR[31:24];
-                    // If first line also repeat for line0
-                    if(first_line == 1)
-                      buf_file[buf_line_sel-1][buf_pixel_idx+4] <= dataR[31:24];
                   end
-              end
+            end
         end
     end
 
@@ -196,7 +182,7 @@ module acc #(
                 next_word_addr = word_addr + 1; // Increment memory word address 
                 // If last word of the line increment line and if we were already writing into 2nd line go to next state
                 if(buf_pixel_idx >= LINE_LENGTH-3) begin // pixel index starts at 1, so we do -3 because last idx will be 349
-                  next_first_line = 0;
+                  // next_first_line = 0;
                   if(buf_line_sel == 2) begin
                     next_state     = PROCESS_AND_WRITEBACK;
                     next_word_addr = word_addr - 1;
@@ -234,7 +220,8 @@ module acc #(
                       next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
                       next_state = PROCESS_AND_WRITEBACK;
                       next_processed_pixel_idx = 1;
-                  end else begin                     
+                  end else begin      
+                      next_first_line = 0;               
                       next_buf_line_sel  = line_top;  // Prepare buf_line_sel for READ_NEW_LINE
                       next_state = DELAY;
                       next_word_addr = word_addr + 1;
@@ -290,7 +277,7 @@ module acc #(
     genvar i;
     generate
         for (i = 0; i < 6; i = i + 1) begin
-            assign work_buffer[i]       = buf_file[line_top][work_pixel_idx - 1 + i];
+            assign work_buffer[i]       = first_line ? buf_file[1][work_pixel_idx - 1 + i] : buf_file[line_top][work_pixel_idx - 1 + i]; // If first line is being processed use line 1 for processing
             assign work_buffer[i + 6]   = buf_file[line_mid][work_pixel_idx - 1 + i];
             // If last line use middle line (boundary condition )
             assign work_buffer[i + 12]  = last_line ? buf_file[line_mid][work_pixel_idx - 1 + i] : buf_file[line_bot][work_pixel_idx - 1 + i];
