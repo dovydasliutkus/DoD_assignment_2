@@ -11,7 +11,7 @@
 //             :
 //
 // ----------------------------------------------------------------------------//
-// TODO FIX LAST LINES RESULTS
+
 module acc #(
     parameter int LINE_LENGTH     = 352,    // pixels per line (must be multiple of 4 for 32-bit words)
     parameter int LINE_COUNT      = 288,    
@@ -230,6 +230,7 @@ module acc #(
               // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
               if (work_pixel_idx >= LINE_LENGTH - 3) begin // -3 because last idx will be 348 (@rst work_pixel_idx=1)
                 next_state = LAST_WRITE;
+                next_work_pixel_idx = 1;             // RESET WORK PIPELINE ALREADY (IN CASE OF LAST LINE)
               end else begin
                   next_work_pixel_idx = next_work_pixel_idx + 4;
                   next_state = PROCESS_AND_WRITEBACK;
@@ -255,7 +256,7 @@ module acc #(
                       next_last_line = 1;
                       next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
                       next_state = PROCESS_AND_WRITEBACK;
-                      next_work_pixel_idx = 1;             //reset pipeline
+                      next_work_pixel_idx = 5;             //start pipeline 
                   end else begin                     
                       next_buf_line_sel  = line_top;  // Prepare buf_line_sel for READ_NEW_LINE
                       next_state = DELAY;
@@ -276,7 +277,7 @@ module acc #(
                 next_state = PROCESS_AND_WRITEBACK;
                 next_buf_line_sel   = 1; 
                 next_buf_pixel_idx  = 1; 
-                next_work_pixel_idx = 5;
+                next_work_pixel_idx = 5;            // Start pipeline
                 next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
 
                 // // If last line re-read same line text time (boundry condition)
@@ -304,10 +305,12 @@ module acc #(
     // Extracts a 3x6 region centered around work_pixel_idx
     //------------------------------------------------------------
     
+    //For the pipeline to work we need to adapt the top/mid/bot idx for the work buffer when not in process state (when line_idx not updated yet)
+    
     logic [1:0]   top, mid, bot;                               
-    assign top = (state == READ_NEW_LINE) ? line_mid : line_top;
-    assign mid = (state == READ_NEW_LINE) ? line_bot : line_mid;
-    assign bot = (state == READ_NEW_LINE) ? line_top : line_bot;
+    assign top = (state != PROCESS_AND_WRITEBACK && state != LOAD_INITIAL_LINES) ? line_mid : line_top;
+    assign mid = (state != PROCESS_AND_WRITEBACK && state != LOAD_INITIAL_LINES) ? line_bot : line_mid;
+    assign bot = (state != PROCESS_AND_WRITEBACK && state != LOAD_INITIAL_LINES) ? line_top : line_bot;
     
     genvar i;
     generate
@@ -315,7 +318,7 @@ module acc #(
             assign work_buffer[i]       = buf_file[top][work_pixel_idx - 1 + i];
             assign work_buffer[i + 6]   = buf_file[mid][work_pixel_idx - 1 + i];
             // If last line use middle line (boundary condition )
-            assign work_buffer[i + 12]  = last_line ? buf_file[mid][work_pixel_idx - 1 + i] : buf_file[bot][work_pixel_idx - 1 + i];
+            assign work_buffer[i + 12]  = (last_line || next_last_line) ? buf_file[mid][work_pixel_idx - 1 + i] : buf_file[bot][work_pixel_idx - 1 + i];
         end
     endgenerate
 
