@@ -189,7 +189,7 @@ module acc #(
                   if(buf_line_sel == 2) begin
                     next_state     = PROCESS_AND_WRITEBACK;
                     next_work_pixel_idx = 5;                // load next pixel group into computation pipeline
-                    next_word_addr = word_addr;
+                    next_word_addr = word_addr-1;
                     next_save_to_buf = 0;
                   end 
                   next_buf_pixel_idx  = 1;                // Reset pixel index for new line
@@ -216,6 +216,7 @@ module acc #(
               // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
               if (work_pixel_idx >= LINE_LENGTH - 3) begin // -3 because last idx will be 348 (@rst work_pixel_idx=1)
                 next_state = LAST_WRITE;
+                next_word_addr = word_addr + 1;
                 next_work_pixel_idx = 1;             // RESET WORK PIPELINE ALREADY (IN CASE OF LAST LINE)
               end else begin
                   next_work_pixel_idx = next_work_pixel_idx + 4;
@@ -247,6 +248,7 @@ module acc #(
                       next_state = DELAY;
                       next_work_pixel_idx = 1;
                   end
+                  next_buf_pixel_idx = 1;
                   next_img_line_count = img_line_count + 1;
             end
             DELAY:begin
@@ -260,10 +262,11 @@ module acc #(
             READ_NEW_LINE: begin
               en = 1'b1;  // Enable memory
               // If full line has been read go back to process and writeback state
-              if(buf_pixel_idx == LINE_LENGTH-3) begin
+              if(buf_pixel_idx == LINE_LENGTH-7) begin
                 next_state = PROCESS_AND_WRITEBACK;
-                next_buf_line_sel   = 1; 
-                next_buf_pixel_idx  = 1; 
+                next_buf_pixel_idx        = buf_pixel_idx + 4; 
+                // next_buf_line_sel   = 1; 
+                // next_buf_pixel_idx  = 1; 
                 next_work_pixel_idx = 5;            // Start pipeline
                 next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
 
