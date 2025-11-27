@@ -13,8 +13,8 @@ module testbench;
     // localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/cross.pgm"; // Path to the input PGM file
     // localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/illusion.pgm"; // Path to the input PGM file
     // localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/pattern.pgm"; // Path to the input PGM file
-    localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/pic1.pgm"; // Path to the input PGM file
-    // localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/systemverilog.pgm"; // Path to the input PGM file
+    // localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/pic1.pgm"; // Path to the input PGM file
+    localparam string load_file_name = "E:/UserData/Desktop/Term1/design_of_digital/assignment2/DoD_assignment_2/other_images/systemverilog.pgm"; // Path to the input PGM file
 
     // Accelerator and memory signals
     logic [15:0] addr;

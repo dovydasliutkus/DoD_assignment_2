@@ -61,7 +61,7 @@ module acc #(
 
     state_t state, next_state;
     
-    // Buffer file for three lines of image LINE_LENGTH+2=354 lines for mirrored border pixels
+    // Buffer file for three lines of image LINE_LENGTH plus 2 for mirrored border pixels
     logic [7:0]   buf_file [0:2][0:LINE_LENGTH+1];
     
     // Buffer line index
@@ -73,9 +73,10 @@ module acc #(
     // Address signals, seperate for read and write
     logic [15:0]  word_addr, next_word_addr, write_word_addr, next_write_word_addr;
 
-    // Image line index for tracking how may lines have been written
+    // Image line index for tracking how many lines have been proccessed and written
     logic [$clog2(LINE_COUNT+2)-1:0 ] img_line_count, next_img_line_count ;
 
+    // First and last line variables to signal when the first or last line are being calculated
     logic first_line, next_first_line, last_line, next_last_line, save_to_buf, next_save_to_buf;
 
     // Below signals for keeping track which line is in which buf_file index. The values will iterate as follows
@@ -97,11 +98,6 @@ module acc #(
     logic [7:0]   work_buffer [0:17];
     logic [31:0]  output_word;
     logic [$clog2(LINE_LENGTH+2)-1:0] work_pixel_idx, next_work_pixel_idx;
-
-    // Try using same pixel index pointer for processing
-    // assign work_pixel_idx = buf_pixel_idx;
-
-   
 
     // Multiplex address based on read/write
     assign addr = we ? write_word_addr : word_addr;
@@ -133,6 +129,7 @@ module acc #(
             work_pixel_idx  <= next_work_pixel_idx;
             save_to_buf     <= next_save_to_buf;
 
+            // If reading from memory to buffer file record into buffer file
             if(save_to_buf) begin
                   // Latch word into corresponding pixel in buffer
                   buf_file[buf_line_sel][buf_pixel_idx + 0] <= dataR[7:0];
@@ -170,84 +167,70 @@ module acc #(
         next_last_line        = last_line;
         next_work_pixel_idx   = work_pixel_idx;
         next_save_to_buf      = save_to_buf;
+
+        // Main FSM
         case (state)
             IDLE: begin
                 if (start) begin
-                    next_state      = LOAD_INITIAL_LINES;
-                    en              = 1'b1;               // enable memory read
-                    next_word_addr  = word_addr + 1;      // Preload next addr to start pipeline reading
-                    next_save_to_buf = 1;
+                    next_state        = LOAD_INITIAL_LINES;
+                    en                = 1'b1;               // enable memory read
+                    next_word_addr    = word_addr + 1;      // Preload next addr to start pipeline reading
+                    next_save_to_buf  = 1;                 // Enabling saving to buffer for Initial read
                 end
             end
             LOAD_INITIAL_LINES: begin
-                en = 1'b1;  // Keep memory enabled
-                next_word_addr = word_addr + 1; // Increment memory word address 
+                en              = 1'b1;           // Keep memory enabled
+                next_word_addr  = word_addr + 1;  // Increment memory word address 
 
                 // If last word of the line increment line and if we were already writing into 2nd line go to next state
                 if(buf_pixel_idx >= LINE_LENGTH-3) begin // pixel index starts at 1, so we do -3 because last idx will be 349
-                  // next_first_line = 0;
                   if(buf_line_sel == 2) begin
-                    next_state     = PROCESS_AND_WRITEBACK;
+                    next_state          = PROCESS_AND_WRITEBACK;
                     next_work_pixel_idx = 5;                // load next pixel group into computation pipeline
-                    next_word_addr = word_addr-1;
-                    next_save_to_buf = 0;
+                    next_word_addr      = word_addr-1;
+                    next_save_to_buf    = 0;
                   end 
-                  next_buf_pixel_idx  = 1;                // Reset pixel index for new line
-                  next_buf_line_sel   = buf_line_sel + 1; // Go to next line, the same pointer is also used in READ_NEW_LINE
+                  next_buf_pixel_idx  = 1;                  // Reset pixel index for new line
+                  next_buf_line_sel   = buf_line_sel + 1;   // Go to next line, the same pointer is also used in READ_NEW_LINE
                 end else begin
                   next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
                 end  
             end
             PROCESS_AND_WRITEBACK: begin
-
-              // For now only write back the same values
               en = 1'b1;
               we = 1'b1;
-              next_save_to_buf = 0;
-              // Prepare processed word to write into memory
-              dataW = {
-                output_word[31:24],
-                output_word[23:16],
-                output_word[15:8],
-                output_word[7:0]
-              };
-              next_write_word_addr = write_word_addr + 1;
-              //       BELOW: LOGIC FOR SAME PIXEL WRITEBACK
-              // If line is done check whether last line, if not go to READ_NEW_LINE, if neither increment pointers and write again
+              next_save_to_buf = 0; // Disable saving to buffer
+              dataW = output_word;  // Prepare processed word to write into memory
+              next_write_word_addr = write_word_addr + 1; // Increment memory write address
+              // If line is done check whether last line, if not go to LAST_WRITE to finish pipelined write, else increment pointers and write again
               if (work_pixel_idx >= LINE_LENGTH - 3) begin // -3 because last idx will be 348 (@rst work_pixel_idx=1)
-                next_state = LAST_WRITE;
-                next_word_addr = word_addr + 1;
+                next_state          = LAST_WRITE;
+                next_word_addr      = word_addr + 1;
                 next_work_pixel_idx = 1;             // RESET WORK PIPELINE ALREADY (IN CASE OF LAST LINE)
               end else begin
-                  next_work_pixel_idx = next_work_pixel_idx + 4;
+                  next_work_pixel_idx = work_pixel_idx + 4;
                   next_state = PROCESS_AND_WRITEBACK;
               end
             end
             LAST_WRITE:begin
               en = 1'b1;
               we = 1'b1;
-              dataW = {
-                output_word[31:24],
-                output_word[23:16],
-                output_word[15:8],
-                output_word[7:0]
-              };
-              
+              dataW = output_word;
               next_write_word_addr = write_word_addr + 1;
-              
-                if(img_line_count == LINE_COUNT) begin
-                    next_state = DONE;
-                  end else if (img_line_count == LINE_COUNT-1) begin
-                      // For last line repeat PROCESS_AND_WRITEBACK no READ_NEW_LINE (boundry condition)
-                      next_last_line = 1;
-                      next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
-                      next_state = PROCESS_AND_WRITEBACK;
-                      next_work_pixel_idx = 5;             //start pipeline 
-                  end else begin                     
-                      next_buf_line_sel  = line_top;  // Prepare buf_line_sel for READ_NEW_LINE
-                      next_state = DELAY;
-                      next_work_pixel_idx = 1;
-                  end
+
+              if(img_line_count == LINE_COUNT) begin 
+                  next_state = DONE;
+                end else if (img_line_count == LINE_COUNT-1) begin
+                    // For last line repeat PROCESS_AND_WRITEBACK no READ_NEW_LINE (boundry condition)
+                    next_last_line  = 1; // This variable makes the workbuffer use the last line twice (boundary condition)
+                    next_line_top   = (line_top + 1) % 3; // Update what is top line in buffer file
+                    next_state      = PROCESS_AND_WRITEBACK;
+                    next_work_pixel_idx = 5;             //start pipeline 
+                end else begin                     
+                    next_buf_line_sel   = line_top;  // Prepare buf_line_sel for READ_NEW_LINE
+                    next_state          = DELAY;
+                    next_work_pixel_idx = 1;
+                end
                   next_buf_pixel_idx = 1;
                   next_img_line_count = img_line_count + 1;
             end
@@ -261,22 +244,14 @@ module acc #(
             end
             READ_NEW_LINE: begin
               en = 1'b1;  // Enable memory
+              next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
               // If full line has been read go back to process and writeback state
-              if(buf_pixel_idx == LINE_LENGTH-7) begin
+              if(buf_pixel_idx == LINE_LENGTH-7) begin // Jump to process state one word earlier 4+3 because read will be finished there (so we don't waste a cycle)
                 next_state = PROCESS_AND_WRITEBACK;
-                next_buf_pixel_idx        = buf_pixel_idx + 4; 
-                // next_buf_line_sel   = 1; 
-                // next_buf_pixel_idx  = 1; 
                 next_work_pixel_idx = 5;            // Start pipeline
                 next_line_top = (line_top + 1) % 3; // Update what is top line in buffer file
-
-                // // If last line re-read same line text time (boundry condition)
-                // if(img_line_count == LINE_COUNT - 1)begin
-                //   next_word_addr = 16'd25256;   // TODO Make expresion instead of magic number
-                // end 
               end else begin
                 next_state          = READ_NEW_LINE;
-                next_buf_pixel_idx  = buf_pixel_idx + 4;  // Increment by 4 because 4 bytes in word
                 next_word_addr      = word_addr + 1;      // Increment word address
               end
             end
@@ -285,7 +260,6 @@ module acc #(
                 if (!start)
                     next_state = IDLE; // allow restart
             end
-
             default: next_state = IDLE;
         endcase
     end
