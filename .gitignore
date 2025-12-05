@@ -1,3 +1,8 @@
 *.log
 *.pb
 *venv
+# Draw.io / diagrams.net autosave and backup files
+*.drawio.bkp
+*.drawio~*
+*.drawio.bak
+*.dtmp
